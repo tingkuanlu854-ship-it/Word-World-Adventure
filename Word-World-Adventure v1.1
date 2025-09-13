@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<title>字界探險</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  html,body{height:100%;margin:0;font-family:Arial,Helvetica,sans-serif;background:#e9ecf7;overflow:hidden}
+  canvas { display:block; }
+  #topbar{
+    position:fixed;left:0;top:0;right:0;height:46px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;box-sizing:border-box;background:rgba(255,255,255,.96);backdrop-filter:saturate(1.2) blur(6px);z-index:80;box-shadow:0 2px 10px rgba(0,0,0,.12);font-size:19px;
+    font-weight:bold;letter-spacing:2px;
+  }
+  #topbar .where {
+    color:#0a7;font-size:19px;font-weight:bold;margin-left:10px;
+    display:inline-block;vertical-align:middle;letter-spacing:1.5px;
+  }
+  #topbar .btn {
+    font-size:16px;padding:6px 16px;
+    border:1px solid #ddd;border-radius:8px;background:#fff;cursor:pointer;letter-spacing:1.3px;
+    font-weight:bold;
+    margin-left:12px;
+  }
+  #hud{position:fixed;left:50%;transform:translateX(-50%);bottom:8px;background:rgba(0,0,0,.7);color:#fff;padding:8px 12px 8px 14px;border-radius:10px;z-index:86;display:flex;gap:22px;align-items:center;font-size:16px;letter-spacing:1.15px;}
+  #messages{position:fixed;left:12px;top:58px;width:38%;max-width:440px;z-index:86}
+  .msg{background:rgba(255,255,255,.94);padding:6px 11px;margin:6px 0;border-radius:6px;box-shadow:0 2px 6px rgba(0,0,0,.13);font-size:15px;letter-spacing:1.05px;}
+  #gameOverOverlay{position:fixed;left:0;top:46px;right:0;bottom:0;display:none;align-items:center;justify-content:center;z-index:100;background:rgba(0,0,0,0.5);color:#fff;font-size:32px}
+  #inventoryBox {
+    width: 620px;
+    min-height: 320px;
+    background: #fff;
+    display: none;
+    box-shadow: 0 6px 20px rgba(0,0,0,.18);
+    border-radius: 14px;
+    z-index: 91;
+    position:fixed;
+    left:50%;top:50%;transform:translate(-50%,-50%);
+    padding: 0;
+    font-size:16px;
+    letter-spacing:1.2px;
+    border:2.5px solid #e7e7e7;
+    overflow:hidden;
+  }
+  .inventory-flex {
+    display: flex;
+    flex-direction: row;
+    gap: 0;
+    width: 100%;
+    height: 100%;
+  }
+  #equipmentPanel {
+    flex: 1 1 0;
+    padding: 22px 8px 17px 18px;
+    border-right: 1.8px solid #e3e3e3;
+    min-width: 170px;
+    max-width: 190px;
+    box-sizing: border-box;
+    background: #f9f9fa;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  #inventoryPanel {
+    flex: 2 1 0;
+    padding: 18px 18px 14px 12px;
+    box-sizing: border-box;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    min-width: 210px;
+    max-width: 340px;
+  }
+  .equip-title {
+    font-size: 17.5px;
+    margin-bottom: 10px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    color:#0a7;
+  }
+  .equip-grid {
+    display: grid;
+    grid-template-columns: 65px 65px;
+    grid-template-rows: 38px 38px 38px;
+    gap: 9px;
+    margin-bottom: 10px;
+    width: 140px;
+  }
+  .equip-slot {
+    border: 1.6px solid #b0b0b0;
+    background: #f5f5f5;
+    min-height: 36px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+    min-width: 55px;
+    font-weight: 500;
+    color: #233;
+    line-height: 1.2;
+    position:relative;
+  }
+  .equip-slot.dragover {
+    background: #ccffe2;
+    border-color: #0a7;
+  }
+  .equip-value {
+    font-weight: bold;
+    color: #0a7;
+    font-size: 16px;
+    margin-top:2px;
+    letter-spacing:2px;
+  }
+  #inventoryPanelTitle {
+    font-size: 17px;
+    margin-bottom: 7px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    color:#191a1a;
+  }
+  #inventoryItems {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    min-height: 90px;
+    margin-bottom: 13px;
+    margin-top: 5px;
+  }
+  .inventory-item {
+    border: 1.5px solid #888;
+    background: #f9f9ff;
+    border-radius: 7px;
+    padding: 7px 14px;
+    cursor: grab;
+    font-size: 16px;
+    user-select: none;
+    transition: box-shadow 0.2s;
+    margin:2px 0;
+    color:#223;
+    font-weight: 500;
+    letter-spacing:1.2px;
+  }
+  .inventory-item.dragging {
+    opacity: 0.45;
+  }
+  .inv-bottom-btns {
+    width: 100%;
+    margin: 0;
+    padding: 0 0 13px 0;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    gap: 25px;
+  }
+  .inv-bottom-btns .btn {
+    min-width: 80px;
+    font-size:16px;
+    padding:7px 19px;
+  }
+  #autoAttackBtn {
+    position:fixed;right:12px;bottom:110px;z-index:90;
+    padding:7px 20px;font-size:16px;border-radius:8px;border:1.4px solid #b0b0b0;background:#fff;font-weight:bold;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.07);
+  }
+  #autoAttackBtn.active{background:#0a7;color:#fff;border-color:#0a7;}
+  #settingsBtn {
+    position:fixed;right:12px;bottom:60px;z-index:90;
+    padding:7px 20px;font-size:16px;border-radius:8px;border:1.4px solid #b0b0b0;background:#fff;font-weight:bold;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.07);
+  }
+  #settingsPanel {
+    position:fixed;right:24px;bottom:110px;z-index:120;background:#fff;padding:24px 30px 20px 30px;border-radius:14px;box-shadow:0 6px 20px rgba(0,0,0,.18);display:none;min-width:320px;max-width:95vw;
+  }
+  #settingsPanel h3{margin-top:0;margin-bottom:10px;font-size:21px;letter-spacing:1.2px;}
+  #settingsPanel label{font-weight:bold;display:block;margin:11px 0 3px 0;}
+  #settingsPanel input[type="text"], #settingsPanel input[type="password"]{font-size:15.5px;padding:5px 7px;border-radius:6px;border:1.3px solid #b0b0b0;}
+  #settingsPanel button{font-size:15.5px;padding:6px 18px;border-radius:7px;margin:7px 0 0 0;}
+  #settingsPanel .skill-row{margin:7px 0;font-weight:500;font-size:16px;}
+  #settingsPanel .skill-btn{margin-left:8px;}
+  #npcDialog {
+    position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+    background:#fff;padding:28px 36px 22px 36px;border-radius:16px;box-shadow:0 6px 20px rgba(0,0,0,.23);z-index:300;display:none;min-width:240px;max-width:95vw;
+    font-size:18px;letter-spacing:1.3px;
+  }
+  #npcDialog .npc-name{font-weight:bold;color:#0a7;font-size:20px;}
+  #npcDialog .npc-text{margin:14px 0 11px 0;white-space:pre-line;}
+  #npcDialog .btn{padding:7px 22px;font-size:16px;border-radius:8px;background:#f5f5f5;border:1.4px solid #c0c0c0;font-weight:bold;cursor:pointer;}
+  #shopBox {
+    width: 540px;
+    background: #fff;
+    display: none;
+    box-shadow: 0 6px 20px rgba(0,0,0,.18);
+    border-radius: 14px;
+    z-index: 200;
+    position:fixed;
+    left:50%;top:50%;transform:translate(-50%,-50%);
+    padding: 24px;
+    font-size:16px;
+    letter-spacing:1.2px;
+    border:2.5px solid #e7e7e7;
+  }
+  #shopBox h3 {
+    margin-top: 0;
+    font-size: 20px;
+    font-weight: bold;
+    color: #0a7;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  #shopBox .item-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+  #shopBox .shop-item {
+    border: 1.5px solid #888;
+    background: #f9f9ff;
+    border-radius: 7px;
+    padding: 10px 18px;
+    cursor: pointer;
+    text-align: center;
+    transition: background 0.2s;
+    font-weight: 500;
+  }
+  #shopBox .shop-item:hover {
+    background: #e9f0ff;
+  }
+  #shopBox .item-price {
+    font-weight: bold;
+    color: #36a;
+    margin-top: 5px;
+  }
+</style>
+</head>
+<body>
+<div id="topbar">
+  <span>字界探險<span class="where" id="whereText">（你在哪裡）</span></span>
+  <div>
+    <button id="btnInv" class="btn">智庫 (L)</button>
+  </div>
+</div>
+<div id="messages"></div>
+<div id="hud">
+  <div>HP <span id="hpText">0</span>/<span id="hpMax">0</span></div>
+  <div>EXP <span id="expText">0</span>/<span id="expMax">0</span></div>
+  <div>Lv <span id="lvText">0</span></div>
+  <div>名稱 <span id="playerNameHud"></span></div>
+  <div>錢 <span id="moneyText">0</span></div>
+</div>
+<button id="autoAttackBtn" class="btn">自動攻擊</button>
+<button id="settingsBtn" class="btn">設定</button>
+<div id="settingsPanel">
+  <h3>設定</h3>
+  <div id="loginSetting">
+    <label>帳號</label>
+    <input type="text" id="loginUser" autocomplete="username">
+    <label>密碼</label>
+    <input type="password" id="loginPass" autocomplete="current-password">
+    <button id="btnLogin" class="btn">登入</button>
+    <button id="btnLogout" class="btn" style="display:none;">登出</button>
+  </div>
+  <div id="registerSetting" style="margin-top:16px;">
+    <label>新帳號</label>
+    <input type="text" id="regUser" autocomplete="username">
+    <label>密碼</label>
+    <input type="password" id="regPass" autocomplete="new-password">
+    <button id="btnRegister" class="btn">註冊</button>
+  </div>
+  <div id="skillSetting" style="margin-top:24px;">
+    <div style="font-weight:bold;font-size:16.5px;">技能點數分配（剩餘 <span id="skillPointsLeft">0</span>）</div>
+    <div class="skill-row">敏捷：<span id="skillAgility">0</span>
+      <button id="btnAddAgility" class="skill-btn btn">+1</button>
+      <span style="color:#666;font-size:13px;">（移動速度）</span>
+    </div>
+    <div class="skill-row">體力：<span id="skillStamina">0</span>
+      <button id="btnAddStamina" class="skill-btn btn">+1</button>
+      <span style="color:#666;font-size:13px;">（最大HP）</span>
+    </div>
+  </div>
+</div>
+<div id="gameOverOverlay"><div id="gameOverText">💀 Game Over</div></div>
+<div id="npcDialog">
+  <div class="npc-name" id="npcName"></div>
+  <div class="npc-text" id="npcText"></div>
+  <button class="btn" onclick="document.getElementById('npcDialog').style.display='none';">關閉</button>
+</div>
+<div id="inventoryBox">
+  <div class="inventory-flex">
+    <div id="equipmentPanel">
+      <div class="equip-title">裝備欄</div>
+      <div class="equip-grid">
+        <div class="equip-slot" data-slot="head" style="grid-column:1/3;">頭部<br><span class="equip-value"></span></div>
+        <div class="equip-slot" data-slot="body">身體<br><span class="equip-value"></span></div>
+        <div class="equip-slot" data-slot="weapon">手部<br>(武器)<br><span class="equip-value"></span></div>
+        <div class="equip-slot" data-slot="feet" style="grid-column:1/3;">腳部<br><span class="equip-value"></span></div>
+      </div>
+    </div>
+    <div id="inventoryPanel">
+      <div id="inventoryPanelTitle">物品欄</div>
+      <div id="inventoryItems"></div>
+      <div style="font-size:13px;color:#666;">拖曳物品到裝備欄可穿戴。點擊物品丟棄。</div>
+    </div>
+  </div>
+  <div class="inv-bottom-btns">
+    <button id="btnCloseInv" class="btn">返回遊戲</button>
+  </div>
+</div>
+<div id="shopBox">
+    <h3 id="shopTitle">雜貨商店</h3>
+    <div class="item-list">
+        <div class="shop-item" data-item="紅水">紅水<br><span class="item-price">10G</span></div>
+        <div class="shop-item" data-item="藍水">藍水<br><span class="item-price">10G</span></div>
+    </div>
+    <div id="sellItems">
+        <h4 style="text-align: center;">出售物品</h4>
+        <div id="sellItemsContainer" style="display:flex; flex-wrap:wrap; gap:10px; justify-content:center;"></div>
+    </div>
+    <button class="btn" onclick="closeShop()">關閉</button>
+</div>
+<canvas id="gameCanvas"></canvas>
+<script>
+/* ==== 核心變動與整合 ==== */
+
+const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
+function resizeAll(){ canvas.width = innerWidth; canvas.height = innerHeight - 46; }
+window.addEventListener('resize', resizeAll); resizeAll();
+
+// ==== 新增：怪物資料庫 ====
+const MONSTER_TEMPLATES = {
+  '史萊姆': { level: 1, hp: 12, attack: 2, size: 36, color: 'rgba(100, 200, 100, 0.8)', symbol: '💧', exp: 5, money: 3 },
+  '野豬': { level: 3, hp: 35, attack: 7, size: 42, color: 'rgba(150, 75, 0, 0.8)', symbol: '🐗', exp: 15, money: 10 }
+};
+
+const MAPS = [
+  { name: "柳風廣場", safe: true, portals: [ { x: ()=>canvas.width-60, y: ()=>canvas.height/2-40, width:40, height:80, to:1, toPortal:0, label:"村口小徑" } ] },
+  { name: "村口小徑", safe: false, monsters: ['史萊姆'], portals: [ { x: ()=>20, y: ()=>canvas.height/2-40, width:40, height:80, to:0, toPortal:0, label:"柳風廣場" }, { x: ()=>canvas.width-60, y: ()=>canvas.height/2-40, width:40, height:80, to:2, toPortal:0, label:"老木橋" }] },
+  { name: "老木橋", safe: false, monsters: ['史萊姆', '野豬'], portals: [ { x: ()=>20, y: ()=>canvas.height/2-40, width:40, height:80, to:1, toPortal:1, label:"村口小徑" }, { x: ()=>canvas.width-60, y: ()=>canvas.height/2-40, width:40, height:80, to:3, toPortal:0, label:"草藥園" }] },
+  { name: "草藥園", safe: false, monsters: ['野豬'], portals: [ { x: ()=>20, y: ()=>canvas.height/2-40, width:40, height:80, to:2, toPortal:1, label:"老木橋" }, { x: ()=>canvas.width-60, y: ()=>canvas.height/2-40, width:40, height:80, to:4, toPortal:0, label:"磨坊河岸" }] },
+  { name: "磨坊河岸", safe: false, monsters: ['野豬'], portals: [ { x: ()=>20, y: ()=>canvas.height/2-40, width:40, height:80, to:3, toPortal:1, label:"草藥園" } ] }
+];
+let currentMap = 0;
+let player = {
+  x:canvas.width/2, y:canvas.height/2, size:44, hp:60, maxHp:60, level:1, alive:true, exp:0, expMax:30, username:"", skillPoints:0,
+  agility:0, stamina:0,
+  money: 0,
+};
+let showPortalPrompt = false, portalToEnter = null;
+let monsters = [], monsterRespawnTimers = [], words = [];
+let inventory = ['人'];
+let equipSlots = { head: null, body: null, weapon: null, feet: null };
+let keys = {}, autoAttack = false;
+const chars = [ '人','刀','火','水','木','土','金','風','雷','心','刀','劍','斧','弓','矛','戟','槌','拳','匕首','鐮','棒','劍刃','長劍','短劍','巨斧','戰錘','弩','火槍','鐵劍','鋼刀','雷劍','炎刀','冰劍','光劍','暗劍','破甲槍','斬鐵刀','重斧','雙刃劍','短弓','長弓','飛刀','手裏劍','刺劍','戰斧','戰刀','鋼斧','鋼劍','火焰劍','雷霆斧','冰霜劍','影刃','毒刃','盾','盔','鎧','甲','護肩','護胸','護腿','護腕','護手','護膝','戰甲','重甲','輕甲','皮甲','布甲','鋼盔','鐵盾','木盾','魔法盾','龍甲','虎甲','火甲','冰甲','雷甲','暗甲','光甲','魔甲','重盾','輕盾','護頭','護脖','護背','護足','護腕鋼甲' ];
+const NPCS = [
+  { 
+    map:0, x:170, y:canvas.height/2, name:"村長", text:`歡迎來到字界探險！\n\n這是一個文字世界的冒險遊戲。\n\n▶ 【移動】用 WASD 或上下左右鍵來移動角色。\n▶ 【傳送】靠近藍色傳送門時，畫面會出現提示，按下「E」鍵可以進入下一個地圖。\n▶ 【戰鬥】點擊地圖上的怪物可以攻擊，擊敗牠們會掉落字詞。\n▶ 【智庫】按下「L」鍵或點擊上方「智庫」按鈕，可以打開物品欄。在這裡可以裝備或丟棄字詞。\n▶ 【設定】右下角「設定」按鈕可以註冊、登入或登出，也可以分配升級後的技能點數。\n▶ 【自動】當你靠近怪物時，按下「自動攻擊」按鈕可以自動戰鬥，適合掛機！\n\n冒險愉快！`
+  },
+  { 
+    map:0, x:canvas.width/2+100, y:canvas.height/2+50, name:"雜貨店老闆", text:`歡迎光臨！需要什麼嗎？`
+  }
+];
+const SHOP_ITEMS = [
+  { name: '紅水', price: 10, effect: { type: 'hp', value: 10 } },
+  { name: '藍水', price: 10, effect: { type: 'mp', value: 10 } }
+];
+const CONSUMABLES = {
+  '紅水': { effect: { type: 'hp', value: 25 } },
+  '藍水': { effect: { type: 'mp', value: 20 } }
+};
+const SELL_PRICE = 5;
+
+function inVillageMap() { return currentMap === 0; }
+
+function saveProfile(u, p) { localStorage.setItem('zgame_user_'+u, JSON.stringify(p)); localStorage.setItem('zgame_last_user', u); }
+function loadProfile(u) { try { return JSON.parse(localStorage.getItem('zgame_user_'+u)); } catch { return null; } }
+let currentUser = null;
+function doLogin(u, pass) {
+  let p = loadProfile(u); if(!p) { addMsg('帳號不存在，請先註冊'); return; }
+  if(p.pass && p.pass !== pass) { addMsg('密碼錯誤'); return; }
+  currentUser = u; Object.assign(player, p.player); player.username = u;
+  inventory = (p.inventory||[]).slice();
+  equipSlots = p.equipSlots||{ head:null, body:null, weapon:null, feet:null };
+  updateSkillPanel(); updateHUD(); updateWhere(); updateEquipPanel(); updateInventoryPanel(); document.getElementById('btnLogout').style.display = "inline-block"; addMsg(`歡迎回來 ${u}！`);
+  enterMap(0,0);
+}
+function doRegister(u, pass) {
+  if(loadProfile(u)) { addMsg('帳號已存在，請直接登入'); return; }
+  currentUser = u;
+  player = { x:canvas.width/2, y:canvas.height/2, size:44, hp:60, maxHp:60, level:1, alive:true, exp:0, expMax:30, username:u, skillPoints:0, agility:0, stamina:0, money: 0 };
+  inventory = ['人'];
+  equipSlots = { head: null, body: null, weapon: null, feet: null };
+  saveProfile(u, { pass, player, inventory, equipSlots });
+  updateSkillPanel(); updateHUD(); updateWhere(); updateEquipPanel(); updateInventoryPanel(); document.getElementById('btnLogout').style.display = "inline-block"; addMsg(`帳號 ${u} 註冊成功！歡迎！`);
+  enterMap(0,0);
+}
+document.getElementById('btnLogin').onclick = ()=>{
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value;
+  doLogin(u, p);
+};
+document.getElementById('btnRegister').onclick = ()=>{
+  const u = document.getElementById('regUser').value.trim();
+  const p = document.getElementById('regPass').value;
+  doRegister(u, p);
+};
+document.getElementById('btnLogout').onclick = ()=>{
+  currentUser = null; player.username = ""; updateHUD(); updateSkillPanel(); updateEquipPanel(); updateInventoryPanel(); document.getElementById('btnLogout').style.display = "none"; addMsg('已登出');
+};
+window.addEventListener('load', ()=>{ document.getElementById('settingsPanel').style.display = "block"; });
+function saveNow() {
+  if(currentUser)
+    saveProfile(currentUser, { pass: loadProfile(currentUser)?.pass, player, inventory, equipSlots });
+}
+
+function addMsg(txt, life=3500){
+  const box = document.createElement('div'); box.className='msg'; box.textContent=txt;
+  document.getElementById('messages').appendChild(box);
+  setTimeout(()=>box.remove(), life);
+}
+function enterMap(mapId, portalId){
+  currentMap = mapId;
+  const p = MAPS[mapId].portals[portalId];
+  player.x = typeof p.x === 'function' ? p.x()+p.width/2 : p.x+p.width/2;
+  player.y = typeof p.y === 'function' ? p.y()+p.height/2 : p.y+p.height/2;
+  words = [];
+  monsters = []; monsterRespawnTimers = [];
+  if(!MAPS[mapId].safe) { initMonstersForMap(); }
+  updateHUD(); updateWhere();
+}
+function updateHUD(){
+  document.getElementById('hpText').textContent = Math.floor(player.hp);
+  document.getElementById('hpMax').textContent = Math.floor(player.maxHp);
+  document.getElementById('lvText').textContent = player.level;
+  document.getElementById('expText').textContent = player.exp;
+  document.getElementById('expMax').textContent = player.expMax;
+  document.getElementById('playerNameHud').textContent = player.username || "";
+  document.getElementById('moneyText').textContent = player.money;
+}
+function updateWhere(){ document.getElementById('whereText').textContent = `：${MAPS[currentMap].name}`; }
+function updatePlayer(dt){
+  let dx=0,dy=0;
+  if(keys['w']||keys['arrowup']) dy-=1;
+  if(keys['s']||keys['arrowdown']) dy+=1;
+  if(keys['a']||keys['arrowleft']) dx-=1;
+  if(keys['d']||keys['arrowright']) dx+=1;
+  let speed = 200 + player.agility*12;
+  const mag = Math.hypot(dx,dy)||1;
+  player.x = Math.max(0, Math.min(canvas.width, player.x + dx/mag*speed*dt));
+  player.y = Math.max(0, Math.min(canvas.height, player.y + dy/mag*speed*dt));
+}
+function checkPortalEntry(){
+  showPortalPrompt = false; portalToEnter = null;
+  const portals = MAPS[currentMap].portals;
+  for(let i=0; i<portals.length; i++){
+    const p = portals[i];
+    const px = typeof p.x === 'function' ? p.x() : p.x;
+    const py = typeof p.y === 'function' ? p.y() : p.y;
+    if( player.x > px && player.x < px+p.width && player.y > py && player.y < py+p.height ){
+      showPortalPrompt = true; portalToEnter = i; return;
+    }
+  }
+}
+addEventListener('keydown', (e)=>{
+  keys[e.key.toLowerCase()] = true;
+  if((e.key==='e'||e.key==='E') && showPortalPrompt && portalToEnter!==null){
+    const portal = MAPS[currentMap].portals[portalToEnter];
+    enterMap(portal.to, portal.toPortal);
+  }
+  if(e.key === 'l' || e.key === 'L'){ openInventory(); }
+});
+addEventListener('keyup', (e)=> { if(e.key) keys[e.key.toLowerCase()] = false; });
+
+function drawGameScene(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = MAPS[currentMap].safe ? "#e9ffe9" : "#e9ecf7";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  for(const p of MAPS[currentMap].portals){
+    const px = typeof p.x === 'function' ? p.x() : p.x;
+    const py = typeof p.y === 'function' ? p.y() : p.y;
+    ctx.fillStyle = "#aaf"; ctx.fillRect(px, py, p.width, p.height);
+    ctx.strokeStyle = "#33f"; ctx.strokeRect(px, py, p.width, p.height);
+    ctx.fillStyle = "#222"; ctx.font = "16px sans-serif"; ctx.textAlign="center";
+    ctx.fillText(p.label, px + p.width/2, py + p.height/2+6);
+  }
+  if(inVillageMap()){
+    for(const npc of NPCS){
+      let x=npc.x, y=npc.y;
+      ctx.fillStyle="#eeb";
+      ctx.beginPath();ctx.arc(x,y,28,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle="#b96";ctx.lineWidth=2;ctx.stroke();
+      ctx.fillStyle="#a63";ctx.font='23px sans-serif';ctx.textAlign='center';
+      if(npc.name === "雜貨店老闆") { ctx.fillText('👨‍💼', x, y + 7); } 
+      else { ctx.fillText('👴',x,y+7); }
+      ctx.font='14px sans-serif';ctx.fillStyle='#191a1a';
+      ctx.fillText(npc.name,x,y+39);
+    }
+  }
+  for(const m of monsters){
+    if(m && m.alive){
+      ctx.fillStyle = m.color;
+      ctx.beginPath(); ctx.arc(m.x, m.y, m.size/2, 0, Math.PI*2); ctx.fill();
+      ctx.font = "20px sans-serif"; ctx.fillStyle = "#fff"; ctx.textAlign = 'center';
+      ctx.fillText(m.symbol, m.x, m.y + 6);
+      ctx.font = "12px sans-serif"; ctx.fillStyle = "#222";
+      ctx.fillText(m.name, m.x, m.y - m.size/2 - 16);
+      ctx.fillStyle = "#c33"; ctx.fillRect(m.x-16, m.y-m.size/2-12, 32*(m.hp/m.maxHp), 6);
+      ctx.strokeStyle = "#222"; ctx.strokeRect(m.x-16, m.y-m.size/2-12, 32, 6);
+    }
+  }
+  for(const w of words){
+    if(!w.collected){
+      ctx.fillStyle = '#666'; ctx.font = '28px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(w.char, w.x, w.y);
+    }
+  }
+  ctx.fillStyle = "#36f";
+  ctx.beginPath(); ctx.arc(player.x, player.y, player.size/2, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = "#fff"; ctx.font = "24px sans-serif"; ctx.textAlign="center";
+  ctx.fillText("人", player.x, player.y);
+  if(showPortalPrompt){
+    ctx.fillStyle = "#fff"; ctx.font = "18px sans-serif"; ctx.textAlign="center";
+    ctx.fillText("按 E 進入傳送門", player.x, player.y - player.size);
+  }
+  ctx.textAlign="left";
+}
+canvas.addEventListener('mousedown', (e)=>{
+  if(inVillageMap()){
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    for(const npc of NPCS){
+      if(Math.hypot(mx-npc.x,my-npc.y) < 34){
+        if(npc.name === '雜貨店老闆'){ openShop(); } 
+        else { showNPCDialog(npc); }
+        return;
+      }
+    }
+  }
+  for(let i=0;i<monsters.length;i++){
+    const m = monsters[i];
+    if(m && m.alive){
+      const d = Math.hypot(m.x - e.offsetX, m.y - e.offsetY);
+      if(d < m.size / 2){ // 點擊判定
+        const distToPlayer = Math.hypot(m.x - player.x, m.y - player.y);
+        if (distToPlayer < 80) { // 攻擊距離判定
+            let baseAtk = 16 + (equipSlots.weapon ? 8 : 0);
+            m.hp -= baseAtk;
+            addMsg("攻擊 " + m.name + " -" + baseAtk + "HP", 1200);
+            if(m.hp <= 0){
+              m.alive = false;
+              const moneyDrop = m.money;
+              player.money += moneyDrop;
+              const expGain = m.exp;
+              player.exp += expGain;
+              addMsg(`擊倒 ${m.name}，獲得 ${expGain} 經驗和 ${moneyDrop}G！`);
+              spawnWord(m.x, m.y);
+              scheduleMonsterRespawn(i);
+              checkLevelUp();
+              updateHUD();
+              saveNow();
+            }
+        } else {
+            addMsg("距離太遠了！", 1500);
+        }
+      }
+    }
+  }
+});
+function showNPCDialog(npc){
+  document.getElementById('npcName').textContent = npc.name;
+  document.getElementById('npcText').textContent = npc.text;
+  document.getElementById('npcDialog').style.display = 'block';
+}
+function collectWords(){
+  for(const w of words){
+    if(!w.collected) {
+      const d = Math.hypot(player.x - w.x, player.y - w.y);
+      if(d < 44){
+        if(inventory.length < 10){ inventory.push(w.char); w.collected = true; addMsg(`撿到字：${w.char}`); updateInventoryPanel(); saveNow(); }
+        else addMsg('智庫已滿，無法收集', 2000);
+      }
+    }
+  }
+}
+function scheduleMonsterRespawn(idx){
+  if(monsterRespawnTimers[idx]) clearTimeout(monsterRespawnTimers[idx]);
+  monsterRespawnTimers[idx] = setTimeout(()=>{
+    monsters[idx] = spawnMonster();
+    monsterRespawnTimers[idx]=null;
+  }, 10000);
+}
+function spawnMonster(){
+    const mapMonsters = MAPS[currentMap].monsters;
+    if (!mapMonsters || mapMonsters.length === 0) return null;
+    const monsterType = mapMonsters[Math.floor(Math.random() * mapMonsters.length)];
+    const template = MONSTER_TEMPLATES[monsterType];
+    return {
+        name: monsterType,
+        x: 100 + Math.random() * (canvas.width - 200),
+        y: 100 + Math.random() * (canvas.height - 200),
+        size: template.size,
+        hp: template.hp,
+        maxHp: template.hp,
+        attack: template.attack,
+        alive: true,
+        color: template.color,
+        symbol: template.symbol,
+        exp: template.exp,
+        money: template.money
+    };
+}
+function initMonstersForMap(){
+  monsters = []; monsterRespawnTimers = [];
+  for(let i=0;i<5;i++){
+    const newMonster = spawnMonster();
+    if(newMonster) {
+      monsters.push(newMonster);
+      monsterRespawnTimers.push(null);
+    }
+  }
+}
+function spawnWord(x,y){
+  const ch = chars[Math.floor(Math.random()*chars.length)];
+  words.push({ x: (x!==undefined?x:Math.random()*canvas.width), y: (y!==undefined?y:Math.random()*canvas.height), char: ch, collected: false });
+}
+function updateMonsters(dt){
+  if(MAPS[currentMap].safe) return;
+  for(const m of monsters){
+    if(m && m.alive){
+      const dx = player.x - m.x, dy = player.y - m.y;
+      const dist = Math.hypot(dx,dy);
+      if(dist > m.size / 2 + player.size / 2) { // 避免重疊
+        m.x += dx/dist*60*dt;
+        m.y += dy/dist*60*dt;
+      }
+      if(dist < 50){
+        player.hp -= m.attack*dt;
+        if(player.hp <= 0) handlePlayerDeath();
+      }
+    }
+  }
+}
+function autoAttackTick(){
+  if(!autoAttack || MAPS[currentMap].safe) return;
+  let minD = 99999, tgtIdx = null;
+  for(let i=0;i<monsters.length;i++){
+    const m = monsters[i];
+    if(m && m.alive){
+      const d = Math.hypot(m.x - player.x, m.y - player.y);
+      if(d < 80 && d < minD) { minD = d; tgtIdx = i; }
+    }
+  }
+  if(tgtIdx!=null){
+    let m = monsters[tgtIdx];
+    let baseAtk = 16 + (equipSlots.weapon ? 8 : 0);
+    m.hp -= baseAtk;
+    addMsg("自動攻擊 " + m.name + " -" + baseAtk + "HP", 1200);
+    if(m.hp <= 0){
+      m.alive = false;
+      const moneyDrop = m.money;
+      player.money += moneyDrop;
+      const expGain = m.exp;
+      player.exp += expGain;
+      addMsg(`擊倒 ${m.name}，獲得 ${expGain} 經驗和 ${moneyDrop}G！`);
+      spawnWord(m.x, m.y);
+      scheduleMonsterRespawn(tgtIdx);
+      checkLevelUp();
+      updateHUD();
+      saveNow();
+    }
+  }
+}
+function handlePlayerDeath(){
+  player.hp = 0;
+  player.alive = false;
+  document.getElementById('gameOverOverlay').style.display = 'flex';
+  document.getElementById('gameOverText').textContent = '💀 Game Over';
+  setTimeout(()=>{ player.hp = player.maxHp; player.alive = true; document.getElementById('gameOverOverlay').style.display = 'none'; enterMap(0,0); saveNow(); }, 2200);
+}
+function checkLevelUp() {
+  while(player.exp >= player.expMax) {
+    player.exp -= player.expMax; player.level++;
+    player.maxHp += 10+player.stamina*4; player.hp = player.maxHp;
+    player.expMax = Math.floor(player.expMax*1.4+10);
+    player.skillPoints = (player.skillPoints||0)+1;
+    addMsg(`升級！Lv.${player.level}，獲得技能點數+1`);
+    updateSkillPanel();
+    saveNow();
+  }
+}
+function gameLoop(ts){
+  updatePlayer(1/60); checkPortalEntry(); updateMonsters(1/60); collectWords();
+  drawGameScene(); updateHUD(); if(frameCount%18===0) autoAttackTick();
+  requestAnimationFrame(gameLoop); frameCount++;
+}
+let frameCount = 0;
+function openInventory() {
+  updateEquipPanel(); updateInventoryPanel();
+  document.getElementById('inventoryBox').style.display = 'block';
+}
+function updateEquipPanel() {
+  const doms = document.querySelectorAll('.equip-slot');
+  doms.forEach(slot => {
+    const key = slot.dataset.slot;
+    slot.querySelector('.equip-value').textContent = equipSlots[key] || '空';
+  });
+}
+function updateInventoryPanel() {
+  const itemsDom = document.getElementById('inventoryItems');
+  itemsDom.innerHTML = '';
+  inventory.forEach((item, idx) => {
+    if (Object.values(equipSlots).includes(item)) return;
+    const el = document.createElement('div');
+    el.className = 'inventory-item';
+    el.draggable = true;
+    el.textContent = item;
+    el.dataset.idx = idx;
+    el.addEventListener('dragstart', e => {
+      el.classList.add('dragging');
+      e.dataTransfer.setData('text/plain', item);
+      setTimeout(()=>el.classList.remove('dragging'), 200);
+    });
+    el.addEventListener('click', e=>{
+      if(CONSUMABLES[item]){
+        useItem(item, idx);
+      } else {
+        inventory.splice(idx,1);
+        addMsg(`丟棄 ${item}`);
+        updateInventoryPanel();
+        updateEquipPanel();
+        saveNow();
+      }
+    });
+    itemsDom.appendChild(el);
+  });
+}
+function useItem(item, idx) {
+  const effect = CONSUMABLES[item].effect;
+  if (effect.type === 'hp') {
+    player.hp += effect.value;
+    if (player.hp > player.maxHp) player.hp = player.maxHp;
+    addMsg(`使用 ${item}，恢復 ${effect.value} HP`);
+  }
+  inventory.splice(idx, 1);
+  updateInventoryPanel();
+  updateHUD();
+  saveNow();
+}
+function updateSkillPanel(){
+  document.getElementById('skillPointsLeft').textContent = player.skillPoints||0;
+  document.getElementById('skillAgility').textContent = player.agility||0;
+  document.getElementById('skillStamina').textContent = player.stamina||0;
+}
+document.getElementById('btnAddAgility').onclick = ()=>{
+  if((player.skillPoints||0)>0){ player.skillPoints--; player.agility++; updateSkillPanel(); saveNow();}
+};
+document.getElementById('btnAddStamina').onclick = ()=>{
+  if((player.skillPoints||0)>0){ player.skillPoints--; player.stamina++; player.maxHp+=7; player.hp+=7; updateSkillPanel(); saveNow();}
+};
+document.querySelectorAll('.equip-slot').forEach(slot => {
+  slot.addEventListener('dragover', e => {
+    e.preventDefault(); slot.classList.add('dragover');
+  });
+  slot.addEventListener('dragleave', e => {
+    slot.classList.remove('dragover');
+  });
+  slot.addEventListener('drop', e => {
+    e.preventDefault(); slot.classList.remove('dragover');
+    const item = e.dataTransfer.getData('text/plain');
+    if (isItemEquipableToSlot(item, slot.dataset.slot)) {
+      equipSlots[slot.dataset.slot] = item;
+      updateEquipPanel(); updateInventoryPanel(); saveNow();
+    }else{
+      addMsg('這個物品不能裝備到這個部位！', 2000);
+    }
+  });
+});
+function isItemEquipableToSlot(item, slot) {
+  if (!item) return false;
+  if (slot === 'weapon') return /刀|劍|斧|槌|槍|矛|弓|矢|弩|棍|棒|劍刃|火槍|飛刀/.test(item);
+  if (slot === 'head') return /盔|帽|頭|冠|鋼盔/.test(item);
+  if (slot === 'body') return /甲|鎧|衣|戰甲|護肩|護胸|護腕|重甲|輕甲|皮甲|布甲/.test(item);
+  if (slot === 'feet') return /鞋|靴|足|護足|護膝/.test(item);
+  return false;
+}
+document.getElementById('btnInv').onclick = openInventory;
+document.getElementById('btnCloseInv').onclick = () => { document.getElementById('inventoryBox').style.display='none'; };
+document.getElementById('autoAttackBtn').onclick = function() {
+  autoAttack = !autoAttack;
+  document.getElementById('autoAttackBtn').classList.toggle('active', autoAttack);
+  addMsg("自動攻擊："+(autoAttack?"開啟":"關閉"));
+};
+document.getElementById('settingsBtn').onclick = function() {
+  let p = document.getElementById('settingsPanel');
+  p.style.display = (p.style.display==="block") ? "none" : "block";
+};
+window.addEventListener('keydown', e=>{
+  if(e.key === 'Escape') {
+    document.getElementById('inventoryBox').style.display='none';
+    document.getElementById('settingsPanel').style.display='none';
+    document.getElementById('npcDialog').style.display='none';
+    document.getElementById('shopBox').style.display='none';
+  }
+});
+function openShop(){
+  document.getElementById('shopBox').style.display = 'block';
+  updateSellItemsPanel();
+}
+function closeShop(){
+  document.getElementById('shopBox').style.display = 'none';
+}
+document.querySelectorAll('.shop-item').forEach(itemBtn => {
+    itemBtn.addEventListener('click', () => {
+        const itemName = itemBtn.dataset.item;
+        const shopItem = SHOP_ITEMS.find(i => i.name === itemName);
+        if (player.money >= shopItem.price) {
+            if (inventory.length < 10) {
+                player.money -= shopItem.price;
+                inventory.push(itemName);
+                addMsg(`購買 ${itemName} 花了 ${shopItem.price}G`);
+                updateHUD();
+                updateInventoryPanel();
+                saveNow();
+            } else {
+                addMsg('智庫已滿，無法購買', 2000);
+            }
+        } else {
+            addMsg('金錢不足！', 2000);
+        }
+    });
+});
+function updateSellItemsPanel() {
+    const sellItemsContainer = document.getElementById('sellItemsContainer');
+    sellItemsContainer.innerHTML = '';
+    inventory.forEach((item, idx) => {
+        if (Object.values(equipSlots).includes(item) || item === '人') return;
+        const el = document.createElement('div');
+        el.className = 'inventory-item';
+        el.textContent = item;
+        el.dataset.idx = idx;
+        el.style.cursor = 'pointer';
+        el.addEventListener('click', () => {
+            player.money += SELL_PRICE;
+            inventory.splice(idx, 1);
+            addMsg(`賣出 ${item} 獲得 ${SELL_PRICE}G`);
+            updateHUD();
+            updateSellItemsPanel();
+            updateInventoryPanel();
+            saveNow();
+        });
+        sellItemsContainer.appendChild(el);
+    });
+}
+enterMap(0,0); gameLoop();
+</script>
+</body>
+</html>
